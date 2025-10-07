@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
-import logo from '../../assets/suitpress-logo.png';
+import logo from '../../assets/login-macbook.png';
 import { Spinner } from '../ui';
 
 export default function LoginComponent() {
@@ -69,8 +69,7 @@ export default function LoginComponent() {
         {/* Columna izquierda */}
         <div className="hidden md:flex flex-col justify-center items-center text-white w-full md:w-1/2 p-10">
           <div className="flex flex-col items-center space-y-3">
-            <img src={logo} alt="Logo Suitpress" width={48} height={44} className="object-contain" />
-            <span className="text-xl font-bold text-blue-700 tracking-wide">SUITPRESS IAO</span>
+            <img src={logo} alt="Logo Suitpress" className="object-contain w-auto h-auto border-none rounded" />
           </div>
         </div>
 
