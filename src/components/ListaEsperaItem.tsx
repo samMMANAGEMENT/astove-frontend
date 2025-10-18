@@ -71,7 +71,7 @@ const ListaEsperaItem: React.FC<ListaEsperaItemProps> = ({
       {isOpen && (
         <div className="p-4">
           <div className="text-xs text-gray-500 mb-3">
-            {new Date(fecha).toLocaleDateString("es-CO", {
+            {new Date(fecha + 'T00:00:00').toLocaleDateString("es-CO", {
               weekday: "long",
               year: "numeric",
               month: "long",
@@ -102,54 +102,50 @@ const ListaEsperaItem: React.FC<ListaEsperaItemProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1">
-                      <Button
+                      <div
                         onClick={() => onAsignarCita(persona)}
-                        size="sm"
-                        variant="ghost"
-                        className="p-1 h-6 w-6 bg-green-500 hover:bg-green-600 rounded-md flex items-center justify-center"
+                        className="p-1 h-6 w-6 bg-green-500 hover:bg-green-600 rounded-md flex items-center justify-center cursor-pointer transition-colors"
+                        title="Asignar cita"
                       >
-                        <Calendar className="w-3 h-3 text-black" />
-                      </Button>
+                        <Calendar className="w-3 h-3 text-white" />
+                      </div>
 
-                      <Button
+                      <div
                         onClick={() => onCambiarFecha(persona)}
-                        size="sm"
-                        variant="ghost"
-                        className="p-1 h-6 w-6 bg-blue-500 hover:bg-blue-600 rounded-md flex items-center justify-center"
+                        className="p-1 h-6 w-6 bg-blue-500 hover:bg-blue-600 rounded-md flex items-center justify-center cursor-pointer transition-colors"
+                        title="Cambiar fecha"
                       >
-                        <CalendarDays className="w-3 h-3 text-black" />
-                      </Button>
+                        <CalendarDays className="w-3 h-3 text-white" />
+                      </div>
 
-                      <Button
+                      <div
                         onClick={() => onEdit(persona)}
-                        size="sm"
-                        variant="ghost"
-                        className="p-1 h-6 w-6 bg-yellow-500 hover:bg-yellow-600 rounded-md flex items-center justify-center"
+                        className="p-1 h-6 w-6 bg-yellow-500 hover:bg-yellow-600 rounded-md flex items-center justify-center cursor-pointer transition-colors"
+                        title="Editar persona"
                       >
-                        <Edit className="w-3 h-3 text-black" />
-                      </Button>
+                        <Edit className="w-3 h-3 text-white" />
+                      </div>
 
-                      <Button
+                      <div
                         onClick={() => onDelete(persona)}
-                        size="sm"
-                        variant="ghost"
-                        className="p-1 h-6 w-6 bg-red-500 hover:bg-red-600 rounded-md flex items-center justify-center"
+                        className="p-1 h-6 w-6 bg-red-500 hover:bg-red-600 rounded-md flex items-center justify-center cursor-pointer transition-colors"
+                        title="Eliminar persona"
                       >
-                        <Trash2 className="w-3 h-3 text-black" />
-                      </Button>
+                        <Trash2 className="w-3 h-3 text-white" />
+                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-1">
                     {persona.telefono && (
                       <div className="flex items-center gap-1 text-xs text-gray-600">
-                        <Phone className="w-3 h-3 text-black" />
+                        <Phone className="w-3 h-3 text-gray-500" />
                         <span>{persona.telefono}</span>
                       </div>
                     )}
                     {persona.notas && (
                       <div className="flex items-start gap-1 text-xs text-gray-600">
-                        <FileText className="w-3 h-3 mt-0.5 flex-shrink-0 text-black" />
+                        <FileText className="w-3 h-3 mt-0.5 flex-shrink-0 text-gray-500" />
                         <span className="line-clamp-2">{persona.notas}</span>
                       </div>
                     )}

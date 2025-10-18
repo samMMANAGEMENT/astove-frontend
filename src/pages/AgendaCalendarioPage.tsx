@@ -34,6 +34,7 @@ interface Horario {
   color: string;
   notas?: string;
   disponible: boolean;
+  es_especifico?: boolean;
   cita?: {
     id: number;
     cliente_nombre: string;
@@ -96,6 +97,17 @@ const AgendaCalendarioPage: React.FC = () => {
     horario: Horario;
     fecha: string;
   } | null>(null);
+  
+  // Estados para crear horario personalizado
+  const [showCrearHorarioModal, setShowCrearHorarioModal] = useState(false);
+  const [horarioPersonalizadoData, setHorarioPersonalizadoData] = useState<{
+    fecha: string;
+    hora_inicio: string;
+    hora_fin: string;
+    titulo: string;
+    color: string;
+    notas: string;
+  } | null>(null);
   const [citaData, setCitaData] = useState<Partial<CrearCitaData>>({
     cliente_nombre: '',
     cliente_telefono: '',
@@ -110,6 +122,14 @@ const AgendaCalendarioPage: React.FC = () => {
   const [showEditarHorarioModal, setShowEditarHorarioModal] = useState(false);
   const [horarioEditForm, setHorarioEditForm] = useState<{ titulo: string; hora_inicio: string; hora_fin: string; dia_semana: 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo'; color: string; notas: string; activo: boolean; id?: number; } | null>(null);
   const diasSemanaValores: Array<'domingo'|'lunes'|'martes'|'miercoles'|'jueves'|'viernes'|'sabado'> = ['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];
+  
+  // Función auxiliar para formatear horas al formato H:i:s
+  const formatearHora = (hora: string): string => {
+    if (hora.includes(':') && hora.split(':').length === 2) {
+      return hora + ':00';
+    }
+    return hora;
+  };
   // Confirmaciones y carga
   const [showConfirmEliminarCita, setShowConfirmEliminarCita] = useState(false);
   const [isDeletingCita, setIsDeletingCita] = useState(false);
@@ -225,10 +245,66 @@ const AgendaCalendarioPage: React.FC = () => {
     setShowCitaModal(true);
   };
 
+  const abrirCrearHorarioPersonalizado = (fecha: string, horaInicio: string) => {
+    // Calcular hora de fin (1 hora después por defecto)
+    const [hora, minuto] = horaInicio.split(':');
+    const horaInicioDate = new Date();
+    horaInicioDate.setHours(parseInt(hora), parseInt(minuto), 0, 0);
+    const horaFinDate = new Date(horaInicioDate.getTime() + 60 * 60 * 1000); // +1 hora
+    const horaFin = `${horaFinDate.getHours().toString().padStart(2, '0')}:${horaFinDate.getMinutes().toString().padStart(2, '0')}`;
+
+    setHorarioPersonalizadoData({
+      fecha,
+      hora_inicio: horaInicio,
+      hora_fin: horaFin,
+      titulo: 'Nuevo Horario',
+      color: '#3B82F6',
+      notas: ''
+    });
+    setShowCrearHorarioModal(true);
+  };
+
+  const crearHorarioPersonalizado = async () => {
+    if (!agendaId || !horarioPersonalizadoData) return;
+    
+    try {
+      setIsSavingHorario(true);
+      
+      // Obtener el día de la semana de la fecha
+      const fechaLocal = new Date(horarioPersonalizadoData.fecha + 'T00:00:00');
+      const diaSemana = diasSemanaValores[fechaLocal.getDay()];
+      
+      const payload = {
+        agenda_id: parseInt(agendaId),
+        titulo: horarioPersonalizadoData.titulo,
+        hora_inicio: formatearHora(horarioPersonalizadoData.hora_inicio),
+        hora_fin: formatearHora(horarioPersonalizadoData.hora_fin),
+        dia_semana: diaSemana,
+        fecha: horarioPersonalizadoData.fecha,
+        color: horarioPersonalizadoData.color,
+        notas: horarioPersonalizadoData.notas,
+        activo: true
+      };
+      
+      await agendaService.createHorario(payload);
+      toast.success('Horario personalizado creado');
+      setShowCrearHorarioModal(false);
+      setHorarioPersonalizadoData(null);
+      await cargarCalendario();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Error al crear horario personalizado');
+    } finally {
+      setIsSavingHorario(false);
+    }
+  };
+
   const abrirEditarHorario = async (horario: Horario, fecha: string) => {
     if (!agendaId) return;
     try {
       setOpeningHorarioId(horario.id);
+      // Establecer la información de la fecha para poder usarla en guardarEdicionHorario
+      setCitaSeleccionada({ horario, fecha });
+      
       // Buscar detalles del horario para obtener dia_semana y activo
       const lista = await agendaService.getHorariosByAgenda(parseInt(agendaId));
       const detalle = lista.find(h => h.id === horario.id);
@@ -253,22 +329,47 @@ const AgendaCalendarioPage: React.FC = () => {
   };
 
   const guardarEdicionHorario = async () => {
-    if (!agendaId || !horarioEditForm?.id) return;
+    if (!agendaId || !horarioEditForm?.id || !citaSeleccionada) return;
     try {
       setIsSavingHorario(true);
-      const payload = {
-        agenda_id: parseInt(agendaId),
-        titulo: horarioEditForm.titulo,
-        hora_inicio: horarioEditForm.hora_inicio,
-        hora_fin: horarioEditForm.hora_fin,
-        dia_semana: horarioEditForm.dia_semana,
-        color: horarioEditForm.color,
-        notas: horarioEditForm.notas,
-        activo: horarioEditForm.activo,
-      } as any;
-      await agendaService.updateHorario(horarioEditForm.id, payload);
-      toast.success('Horario actualizado');
+      
+      // Verificar si el horario que se está editando es específico o base
+      const horarioOriginal = calendarioData?.calendario
+        .flatMap(dia => dia.horarios)
+        .find(h => h.id === horarioEditForm.id);
+      
+      if (horarioOriginal?.es_especifico) {
+        // Si es un horario específico, actualizar directamente
+        const payload = {
+          agenda_id: parseInt(agendaId),
+          titulo: horarioEditForm.titulo,
+          hora_inicio: formatearHora(horarioEditForm.hora_inicio),
+          hora_fin: formatearHora(horarioEditForm.hora_fin),
+          dia_semana: horarioEditForm.dia_semana,
+          color: horarioEditForm.color,
+          notas: horarioEditForm.notas,
+          activo: horarioEditForm.activo,
+        } as any;
+        await agendaService.updateHorario(horarioEditForm.id, payload);
+        toast.success('Horario actualizado');
+      } else {
+        // Si es un horario base, crear un horario específico para esta fecha
+        const payload = {
+          horario_base_id: horarioEditForm.id,
+          fecha: citaSeleccionada.fecha,
+          titulo: horarioEditForm.titulo,
+          hora_inicio: formatearHora(horarioEditForm.hora_inicio),
+          hora_fin: formatearHora(horarioEditForm.hora_fin),
+          color: horarioEditForm.color,
+          notas: horarioEditForm.notas,
+          activo: horarioEditForm.activo,
+        };
+        await agendaService.crearHorarioEspecifico(payload);
+        toast.success('Horario específico creado para esta fecha');
+      }
+      
       setShowEditarHorarioModal(false);
+      setCitaSeleccionada(null); // Limpiar el estado
       await cargarCalendario();
     } catch (error:any) {
       toast.error(error.response?.data?.error || 'Error al actualizar horario');
@@ -281,10 +382,40 @@ const AgendaCalendarioPage: React.FC = () => {
     if (!horarioEditForm?.id) return;
     try {
       setIsDeletingHorario(true);
-      await agendaService.deleteHorario(horarioEditForm.id);
-      toast.success('Horario eliminado');
+      
+      // Verificar si el horario que se está eliminando es específico o base
+      const horarioOriginal = calendarioData?.calendario
+        .flatMap(dia => dia.horarios)
+        .find(h => h.id === horarioEditForm.id);
+      
+      if (horarioOriginal?.es_especifico) {
+        // Si es un horario específico, eliminarlo directamente
+        await agendaService.deleteHorario(horarioEditForm.id);
+        toast.success('Horario específico eliminado');
+      } else {
+        // Si es un horario base, crear un horario específico desactivado para esta fecha
+        if (citaSeleccionada) {
+          const payload = {
+            horario_base_id: horarioEditForm.id,
+            fecha: citaSeleccionada.fecha,
+            titulo: horarioEditForm.titulo,
+            hora_inicio: formatearHora(horarioEditForm.hora_inicio),
+            hora_fin: formatearHora(horarioEditForm.hora_fin),
+            color: horarioEditForm.color,
+            notas: horarioEditForm.notas,
+            activo: false, // Desactivar para esta fecha específica
+          };
+          await agendaService.crearHorarioEspecifico(payload);
+          toast.success('Horario desactivado para esta fecha');
+        } else {
+          await agendaService.deleteHorario(horarioEditForm.id);
+          toast.success('Horario eliminado');
+        }
+      }
+      
       setShowEditarHorarioModal(false);
       setShowConfirmEliminarHorario(false);
+      setCitaSeleccionada(null); // Limpiar el estado
       await cargarCalendario();
     } catch (error:any) {
       toast.error(error.response?.data?.error || 'Error al eliminar horario');
@@ -435,6 +566,20 @@ const AgendaCalendarioPage: React.FC = () => {
   };
 
   const diasParaMostrar = getDiasParaMostrar();
+
+  // Función para generar slots de tiempo vacíos (cada 30 minutos de 6:00 a 22:00)
+  const generarSlotsTiempo = () => {
+    const slots = [];
+    for (let hora = 6; hora < 22; hora++) {
+      for (let minuto = 0; minuto < 60; minuto += 30) {
+        const tiempo = `${hora.toString().padStart(2, '0')}:${minuto.toString().padStart(2, '0')}`;
+        slots.push(tiempo);
+      }
+    }
+    return slots;
+  };
+
+  const slotsTiempo = generarSlotsTiempo();
 
   if (isLoading) {
     return (
@@ -595,47 +740,83 @@ const AgendaCalendarioPage: React.FC = () => {
                   {dia.dia}
                 </div>
                 
-                <div className="space-y-1">
-                  {dia.horarios.map((horario) => (
-                    <div
-                      key={horario.id}
-                      className={`time-slot ${
-                        horario.disponible 
-                          ? 'available' 
-                          : 'occupied'
-                      }`}
-                      onClick={() => abrirModalCita(horario, dia.fecha)}
-                      style={{ borderLeftColor: horario.color }}
-                    >
-                      <div className="time-slot-title">{horario.titulo}</div>
-                      <div className="time-slot-time">
-                        {formatTime(horario.hora_inicio)} - {formatTime(horario.hora_fin)}
-                      </div>
-                      {horario.disponible && (
-                        <div className="mt-1 flex justify-end">
-                          <button
-                            className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 disabled:opacity-60"
-                            onClick={(e) => { e.stopPropagation(); abrirEditarHorario(horario, dia.fecha); }}
-                            title="Editar horario"
-                            disabled={openingHorarioId === horario.id}
-                          >
-                            {openingHorarioId === horario.id ? (
-                              <Spinner size="sm" />
-                            ) : (
-                              <>
-                                <Edit className="w-3 h-3" /> Editar
-                              </>
+                <div className="space-y-1 relative">
+                  {/* Slots de tiempo clickeables */}
+                  {slotsTiempo.map((slot) => {
+                    // Verificar si hay un horario existente en este slot
+                    const horarioExistente = dia.horarios.find(h => {
+                      const inicio = h.hora_inicio.substring(0, 5); // HH:MM
+                      return inicio === slot;
+                    });
+
+                    if (horarioExistente) {
+                      // Mostrar horario existente
+                      return (
+                        <div
+                          key={`${dia.fecha}-${slot}-existing`}
+                          className={`time-slot ${
+                            horarioExistente.disponible 
+                              ? 'available' 
+                              : 'occupied'
+                          }`}
+                          onClick={() => abrirModalCita(horarioExistente, dia.fecha)}
+                          style={{ borderLeftColor: horarioExistente.color }}
+                        >
+                          <div className="time-slot-title">
+                            {horarioExistente.titulo}
+                            {horarioExistente.es_especifico && (
+                              <span className="ml-1 text-xs text-blue-600" title="Horario específico de este día">
+                                ⭐
+                              </span>
                             )}
-                          </button>
+                          </div>
+                          <div className="time-slot-time">
+                            {formatTime(horarioExistente.hora_inicio)} - {formatTime(horarioExistente.hora_fin)}
+                          </div>
+                          {horarioExistente.disponible && (
+                            <div className="mt-1 flex justify-end">
+                              <button
+                                className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 disabled:opacity-60"
+                                onClick={(e) => { e.stopPropagation(); abrirEditarHorario(horarioExistente, dia.fecha); }}
+                                title="Editar horario"
+                                disabled={openingHorarioId === horarioExistente.id}
+                              >
+                                {openingHorarioId === horarioExistente.id ? (
+                                  <Spinner size="sm" />
+                                ) : (
+                                  <>
+                                    <Edit className="w-3 h-3" /> Editar
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                          {!horarioExistente.disponible && (
+                            <div className="time-slot-client">
+                              {horarioExistente.cita?.cliente_nombre}
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {!horario.disponible && (
-                        <div className="time-slot-client">
-                          {horario.cita?.cliente_nombre}
+                      );
+                    } else {
+                      // Mostrar slot vacío clickeable
+                      return (
+                        <div
+                          key={`${dia.fecha}-${slot}-empty`}
+                          className="time-slot-empty border border-dashed border-gray-300 rounded p-2 cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors min-h-[60px] flex flex-col justify-center"
+                          onClick={() => abrirCrearHorarioPersonalizado(dia.fecha, slot)}
+                          title={`Crear horario a las ${slot}`}
+                        >
+                          <div className="time-slot-time text-gray-400 text-sm">
+                            {slot}
+                          </div>
+                          <div className="text-xs text-gray-400 opacity-0 hover:opacity-100 transition-opacity">
+                            + Crear horario
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                      );
+                    }
+                  })}
                 </div>
               </div>
             ))}
@@ -919,10 +1100,32 @@ const AgendaCalendarioPage: React.FC = () => {
       <Modal
         isOpen={showEditarHorarioModal}
         onClose={() => setShowEditarHorarioModal(false)}
-        title={'Editar Horario'}
+        title={(() => {
+          const horarioOriginal = calendarioData?.calendario
+            .flatMap(dia => dia.horarios)
+            .find(h => h.id === horarioEditForm?.id);
+          return horarioOriginal?.es_especifico ? 'Editar Horario Específico' : 'Editar Horario';
+        })()}
       >
         {horarioEditForm && (
           <div className="space-y-4 text-gray-600">
+            {(() => {
+              const horarioOriginal = calendarioData?.calendario
+                .flatMap(dia => dia.horarios)
+                .find(h => h.id === horarioEditForm.id);
+              
+              if (!horarioOriginal?.es_especifico) {
+                return (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Nota:</strong> Este es un horario base que se repite semanalmente. 
+                      Al editarlo, se creará un horario específico solo para esta fecha sin afectar otros días.
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Título</label>
               <Input value={horarioEditForm.titulo} onChange={(e)=>setHorarioEditForm({ ...horarioEditForm, titulo: e.target.value })} />
@@ -962,7 +1165,7 @@ const AgendaCalendarioPage: React.FC = () => {
               Activo
             </label>
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="secondary" onClick={()=>setShowEditarHorarioModal(false)} disabled={isSavingHorario || isDeletingHorario}>Cancelar</Button>
+              <Button variant="secondary" onClick={()=>{setShowEditarHorarioModal(false); setCitaSeleccionada(null);}} disabled={isSavingHorario || isDeletingHorario}>Cancelar</Button>
               <Button variant="danger" onClick={()=>setShowConfirmEliminarHorario(true)} disabled={isSavingHorario || isDeletingHorario}>
                 Eliminar
               </Button>
@@ -982,12 +1185,106 @@ const AgendaCalendarioPage: React.FC = () => {
         <div className="space-y-4">
           <p className="text-gray-700">¿Deseas eliminar este horario? Esta acción no se puede deshacer.</p>
           <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={()=>setShowConfirmEliminarHorario(false)} disabled={isDeletingHorario}>Cancelar</Button>
+            <Button variant="secondary" onClick={()=>{setShowConfirmEliminarHorario(false); setCitaSeleccionada(null);}} disabled={isDeletingHorario}>Cancelar</Button>
             <Button variant="danger" onClick={eliminarHorario} disabled={isDeletingHorario}>
               {isDeletingHorario ? <Spinner size="sm" /> : 'Eliminar'}
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Modal para crear horario personalizado */}
+      <Modal
+        isOpen={showCrearHorarioModal}
+        onClose={() => setShowCrearHorarioModal(false)}
+        title="Crear Horario Personalizado"
+        size="md"
+      >
+        {horarioPersonalizadoData && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-black">
+              <p className="text-sm text-blue-800">
+                <strong>Fecha:</strong> {parseYmdToLocalDate(horarioPersonalizadoData.fecha).toLocaleDateString('es-CO', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Título del Horario *</label>
+              <Input
+                value={horarioPersonalizadoData.titulo}
+                onChange={(e) => setHorarioPersonalizadoData({ ...horarioPersonalizadoData, titulo: e.target.value })}
+                placeholder="Ej: Corte de cabello, Manicura, etc."
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-black">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hora de Inicio</label>
+                <input
+                  type="time"
+                  value={horarioPersonalizadoData.hora_inicio}
+                  onChange={(e) => setHorarioPersonalizadoData({ ...horarioPersonalizadoData, hora_inicio: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hora de Fin</label>
+                <input
+                  type="time"
+                  value={horarioPersonalizadoData.hora_fin}
+                  onChange={(e) => setHorarioPersonalizadoData({ ...horarioPersonalizadoData, hora_fin: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Color</label>
+              <input
+                type="color"
+                value={horarioPersonalizadoData.color}
+                onChange={(e) => setHorarioPersonalizadoData({ ...horarioPersonalizadoData, color: e.target.value })}
+                className="h-10 w-16 p-0 border rounded"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+              <textarea
+                value={horarioPersonalizadoData.notas}
+                onChange={(e) => setHorarioPersonalizadoData({ ...horarioPersonalizadoData, notas: e.target.value })}
+                placeholder="Notas adicionales sobre este horario"
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowCrearHorarioModal(false);
+                  setHorarioPersonalizadoData(null);
+                }}
+                disabled={isSavingHorario}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={crearHorarioPersonalizado}
+                disabled={isSavingHorario || !horarioPersonalizadoData.titulo.trim()}
+              >
+                {isSavingHorario ? <Spinner size="sm" className="mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                Crear Horario
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
