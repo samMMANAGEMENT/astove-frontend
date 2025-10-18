@@ -11,6 +11,7 @@ import { DataTable, PageHeader, SearchFilters, Card } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 import servicioService, { type ServicioRealizado, type PaginationInfo } from '../lib/services/servicioService';
 import { Trash2, AlertTriangle } from 'lucide-react';
+import AdvancedFilters from '../components/AdvancedFilters';
 import '../lib/dateConfig';
 import { formatDateForAPI } from '../lib/dateConfig';
 
@@ -70,6 +71,18 @@ export default function ServicesRegister() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [servicioToDelete, setServicioToDelete] = useState<ServicioRealizado | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Estados para filtros avanzados
+  const [filters, setFilters] = useState({
+    fechaDesde: '',
+    fechaHasta: '',
+    empleadoId: '',
+    metodoPago: '',
+    precioMinimo: '',
+    precioMaximo: ''
+  });
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [isLoadingFilters, setIsLoadingFilters] = useState(false);
 
   // Hooks para API
   const apiServicios = useApi();
@@ -137,6 +150,25 @@ export default function ServicesRegister() {
       .finally(() => setIsLoading(false));
   }, []);
 
+  // Cargar operadores para filtros (solo para admin/supervisor)
+  useEffect(() => {
+    if (user?.role?.nombre !== 'operador') {
+      apiOperadores.get('/operadores/listar-operador')
+        .then((data) => {
+          // Mapear para mostrar nombre + apellido
+          const operadoresMapeados = (Array.isArray(data) ? data : []).map((op: any) => ({
+            id: op.id.toString(),
+            name: `${op.nombre} ${op.apellido}`
+          }));
+          setOperadores(operadoresMapeados);
+        })
+        .catch((error) => {
+          console.error('Error cargando operadores para filtros:', error);
+          setOperadores([]);
+        });
+    }
+  }, [user]);
+
   // Obtener operadores cuando se abre el modal
   useEffect(() => {
     if (modalOpen) {
@@ -154,7 +186,7 @@ export default function ServicesRegister() {
           .then((data) => {
             // Mapear para mostrar nombre + apellido
             const operadoresMapeados = (Array.isArray(data) ? data : []).map((op: any) => ({
-              id: op.id,
+              id: op.id.toString(),
               name: `${op.nombre} ${op.apellido}`
             }));
             setOperadores(operadoresMapeados);
@@ -391,7 +423,7 @@ export default function ServicesRegister() {
   };
 
   // Recargar solo el histórico después de asignar
-  const cargarServiciosRealizados = async (page = 1, search = '', itemsPerPage = perPage) => {
+  const cargarServiciosRealizados = async (page = 1, search = '', itemsPerPage = perPage, customFilters = filters) => {
     try {
       const params: any = {
         page,
@@ -406,6 +438,26 @@ export default function ServicesRegister() {
       // Si es operador, filtrar solo sus servicios
       if (user?.role?.nombre === 'operador' && user?.operador?.id) {
         params.empleado_id = user.operador.id;
+      }
+
+      // Agregar filtros avanzados
+      if (customFilters.fechaDesde) {
+        params.fecha_desde = customFilters.fechaDesde;
+      }
+      if (customFilters.fechaHasta) {
+        params.fecha_hasta = customFilters.fechaHasta;
+      }
+      if (customFilters.empleadoId && user?.role?.nombre !== 'operador') {
+        params.empleado_id = customFilters.empleadoId;
+      }
+      if (customFilters.metodoPago) {
+        params.metodo_pago = customFilters.metodoPago;
+      }
+      if (customFilters.precioMinimo) {
+        params.precio_minimo = parseFloat(customFilters.precioMinimo);
+      }
+      if (customFilters.precioMaximo) {
+        params.precio_maximo = parseFloat(customFilters.precioMaximo);
       }
 
       const response = await servicioService.listarServiciosRealizados(params);
@@ -423,6 +475,40 @@ export default function ServicesRegister() {
         to: 0
       });
     }
+  };
+
+  // Funciones para manejar filtros
+  const handleFiltersChange = (newFilters: typeof filters) => {
+    setFilters(newFilters);
+  };
+
+  const handleClearFilters = async () => {
+    setIsLoadingFilters(true);
+    setFilters({
+      fechaDesde: '',
+      fechaHasta: '',
+      empleadoId: '',
+      metodoPago: '',
+      precioMinimo: '',
+      precioMaximo: ''
+    });
+    // Recargar datos sin filtros
+    await cargarServiciosRealizados(1, searchValue, perPage, {
+      fechaDesde: '',
+      fechaHasta: '',
+      empleadoId: '',
+      metodoPago: '',
+      precioMinimo: '',
+      precioMaximo: ''
+    });
+    setIsLoadingFilters(false);
+  };
+
+  const handleApplyFilters = async () => {
+    setIsLoadingFilters(true);
+    setFiltersOpen(false);
+    await cargarServiciosRealizados(1, searchValue, perPage, filters);
+    setIsLoadingFilters(false);
   };
 
   // Filtrar servicios por nombre
@@ -979,6 +1065,20 @@ export default function ServicesRegister() {
                 </div>
               </div>
             </div>
+
+            {/* Filtros avanzados */}
+            <AdvancedFilters
+              filters={filters}
+              onFiltersChange={handleFiltersChange}
+              onClearFilters={handleClearFilters}
+              onApplyFilters={handleApplyFilters}
+              operadores={operadores}
+              isOpen={filtersOpen}
+              onToggle={() => setFiltersOpen(!filtersOpen)}
+              showOperadorFilter={user?.role?.nombre !== 'operador'}
+              isLoading={isLoadingFilters}
+            />
+
             <DataTable
               data={serviciosRealizados}
               showPagination={true}

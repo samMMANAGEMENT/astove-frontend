@@ -55,6 +55,11 @@ interface ListarServiciosRealizadosParams {
   per_page?: number;
   search?: string;
   empleado_id?: number;
+  fecha_desde?: string;
+  fecha_hasta?: string;
+  metodo_pago?: 'efectivo' | 'transferencia' | 'mixto';
+  precio_minimo?: number;
+  precio_maximo?: number;
 }
 
 const getAll = async (): Promise<Servicio[]> => {
