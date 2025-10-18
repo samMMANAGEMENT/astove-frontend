@@ -29,6 +29,7 @@ export interface Horario {
   hora_inicio: string;
   hora_fin: string;
   dia_semana: 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
+  fecha?: string;
   color: string;
   notas?: string;
   activo: boolean;
@@ -49,6 +50,18 @@ export interface CrearHorarioData {
   hora_inicio: string;
   hora_fin: string;
   dia_semana: 'lunes' | 'martes' | 'miercoles' | 'jueves' | 'viernes' | 'sabado' | 'domingo';
+  fecha?: string;
+  color?: string;
+  notas?: string;
+  activo?: boolean;
+}
+
+export interface CrearHorarioEspecificoData {
+  horario_base_id: number;
+  fecha: string;
+  titulo?: string;
+  hora_inicio?: string;
+  hora_fin?: string;
   color?: string;
   notas?: string;
   activo?: boolean;
@@ -127,6 +140,11 @@ class AgendaService {
     return response.data;
   }
 
+  async crearHorarioEspecifico(data: CrearHorarioEspecificoData): Promise<Horario> {
+    const response = await apiClient.post('/agenda/crear-horario-especifico', data);
+    return response.data;
+  }
+
   async getHorariosByAgenda(agendaId: number): Promise<Horario[]> {
     const response = await apiClient.get(`/agenda/horarios-agenda/${agendaId}`);
     return response.data;
@@ -162,9 +180,20 @@ class AgendaService {
     return response.data;
   }
 
-  async obtenerDisponibilidadTiempoReal(fecha?: string): Promise<any> {
-    const params = fecha ? `?fecha=${fecha}` : '';
-    const response = await apiClient.get(`/agenda/disponibilidad-tiempo-real${params}`);
+  async obtenerDisponibilidadTiempoReal(fecha?: string | Date): Promise<any> {
+    let fechaParam = '';
+    if (fecha) {
+      // Asegurar que la fecha sea una cadena válida
+      if (fecha instanceof Date) {
+        fechaParam = `?fecha=${fecha.toISOString().split('T')[0]}`;
+      } else if (typeof fecha === 'string') {
+        fechaParam = `?fecha=${fecha}`;
+      } else {
+        console.error('Tipo de fecha inválido:', typeof fecha, fecha);
+        fechaParam = '';
+      }
+    }
+    const response = await apiClient.get(`/agenda/disponibilidad-tiempo-real${fechaParam}`);
     return response.data;
   }
 }

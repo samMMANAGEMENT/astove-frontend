@@ -323,13 +323,30 @@ const AgendasPage: React.FC = () => {
     }
 
     try {
-      // Aquí deberías integrar con el servicio de citas existente
-      // Por ahora solo mostramos un mensaje de éxito
-      toast.success(`Cita asignada para ${personaParaCita.nombre} en ${agendaSeleccionada.nombre}`);
+      // Crear la cita usando el servicio de agenda
+      const citaData = {
+        agenda_id: agendaSeleccionada.id,
+        horario_id: horarioSeleccionado.id,
+        cliente_nombre: personaParaCita.nombre,
+        cliente_telefono: personaParaCita.telefono,
+        servicio: personaParaCita.servicio,
+        fecha: fechaDisponibilidad,
+        hora_inicio: horarioSeleccionado.hora_inicio,
+        hora_fin: horarioSeleccionado.hora_fin,
+        estado: 'confirmada' as const,
+        notas: personaParaCita.notas || `Cita creada desde lista de espera - ${new Date().toLocaleString('es-CO')}`
+      };
+
+      await agendaService.crearCita(citaData);
       
-      // Opcional: eliminar de la lista de espera después de asignar cita
-      // await listaEsperaService.delete(personaParaCita.id);
-      // cargarListaEspera();
+      // Eliminar de la lista de espera después de asignar cita exitosamente
+      await listaEsperaService.delete(personaParaCita.id);
+      
+      toast.success(`Cita asignada exitosamente para ${personaParaCita.nombre} en ${agendaSeleccionada.nombre}`);
+      
+      // Recargar datos
+      cargarListaEspera();
+      cargarDisponibilidadTiempoReal();
       
       setShowAsignarCitaModal(false);
       setPersonaParaCita(null);
@@ -337,7 +354,7 @@ const AgendasPage: React.FC = () => {
       setHorarioSeleccionado(null);
     } catch (error: any) {
       console.error('Error al asignar cita:', error);
-      toast.error('Error al asignar la cita');
+      toast.error(error.response?.data?.error || 'Error al asignar la cita');
     }
   };
 
@@ -1065,10 +1082,21 @@ const AgendasPage: React.FC = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Seleccionar Horario
                 </label>
+                {disponibilidadTiempoReal?.disponibilidad
+                  ?.find((d: any) => d.agenda_id === agendaSeleccionada.id)
+                  ?.horarios_disponibles?.filter((horario: any) => horario.disponible)
+                  ?.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <p className="text-sm">No hay horarios disponibles para esta agenda en la fecha seleccionada</p>
+                    <p className="text-xs text-gray-400 mt-1">Intenta con otra fecha o agenda</p>
+                  </div>
+                ) : (
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {disponibilidadTiempoReal?.disponibilidad
                     ?.find((d: any) => d.agenda_id === agendaSeleccionada.id)
-                    ?.horarios_disponibles?.map((horario: any) => (
+                    ?.horarios_disponibles?.filter((horario: any) => horario.disponible)
+                    ?.map((horario: any) => (
                     <div
                       key={horario.id}
                       className={`p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -1084,19 +1112,44 @@ const AgendasPage: React.FC = () => {
                           <p className="text-sm text-gray-600">
                             {formatTime(horario.hora_inicio)} - {formatTime(horario.hora_fin)}
                           </p>
+                          {horario.es_especifico && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800 mt-1">
+                              ⭐ Horario específico
+                            </span>
+                          )}
                         </div>
                         <div className="text-right">
-                          <Badge variant={horario.disponible ? 'success' : 'outline'}>
-                            {horario.disponible ? 'Disponible' : 'Ocupado'}
+                          <Badge variant="success">
+                            Disponible
                           </Badge>
                           <p className="text-xs text-gray-500 mt-1">
-                            {horario.disponibles}/{horario.capacidad} espacios
+                            Disponible
                           </p>
                         </div>
                       </div>
                     </div>
                   ))}
+                  
+                  {disponibilidadTiempoReal?.disponibilidad
+                    ?.find((d: any) => d.agenda_id === agendaSeleccionada.id)
+                    ?.horarios_disponibles?.filter((horario: any) => !horario.disponible)
+                    ?.length > 0 && (
+                    <div className="text-center py-4 text-gray-500">
+                      <p className="text-sm">Horarios ocupados:</p>
+                      <div className="space-y-1 mt-2">
+                        {disponibilidadTiempoReal?.disponibilidad
+                          ?.find((d: any) => d.agenda_id === agendaSeleccionada.id)
+                          ?.horarios_disponibles?.filter((horario: any) => !horario.disponible)
+                          ?.map((horario: any) => (
+                          <div key={horario.id} className="text-xs text-gray-400">
+                            {horario.titulo} - {formatTime(horario.hora_inicio)} (Ocupado)
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
+                )}
               </div>
             )}
 
