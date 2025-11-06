@@ -71,6 +71,7 @@ export default function ServicesRegister() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [servicioToDelete, setServicioToDelete] = useState<ServicioRealizado | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Estados para filtros avanzados
   const [filters, setFilters] = useState({
@@ -395,6 +396,8 @@ export default function ServicesRegister() {
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
       const serviciosData = serviciosSeleccionados.map(s => ({
         servicio_id: Number(s.servicio.id),
@@ -419,6 +422,8 @@ export default function ServicesRegister() {
       }, 1200);
     } catch (e: any) {
       toast.error(e?.response?.data?.message || 'Error al asignar los servicios');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1025,10 +1030,17 @@ export default function ServicesRegister() {
 
               <Button
                 onClick={handleAsignarMultiples}
-                disabled={!selectedOperador || serviciosSeleccionados.length === 0 || !validarMontos()}
+                disabled={!selectedOperador || serviciosSeleccionados.length === 0 || !validarMontos() || isSubmitting}
                 className="w-full"
               >
-                {user?.role?.nombre === 'operador' ? 'Registrar Mis Servicios' : 'Registrar Servicios'}
+                {isSubmitting ? (
+                  <div className="flex items-center justify-center">
+                    <Spinner size="sm" className="mr-2" />
+                    Registrando...
+                  </div>
+                ) : (
+                  user?.role?.nombre === 'operador' ? 'Registrar Mis Servicios' : 'Registrar Servicios'
+                )}
               </Button>
               {successMsg && <div className="text-green-600 text-center font-semibold mt-2">{successMsg}</div>}
               {apiAsignar.error && <div className="text-red-500 text-center mt-2">{apiAsignar.error}</div>}
