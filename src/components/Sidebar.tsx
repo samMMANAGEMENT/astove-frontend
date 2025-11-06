@@ -76,8 +76,6 @@ const getSidebarItems = (userRole?: string, hasModuleAccess?: (module: string) =
             label: 'Inventario',
             icon: <Package className="w-5 h-5" />,
             href: '/inventario/lista',
-            isPremium: true,
-            premiumLabel: 'NEW'
         },
         {
             id: 'ingresos-adicionales',
@@ -90,8 +88,6 @@ const getSidebarItems = (userRole?: string, hasModuleAccess?: (module: string) =
             label: 'Agendas',
             icon: <Calendar className="w-5 h-5" />,
             href: '/agendas',
-            isPremium: true,
-            premiumLabel: 'NEW'
         },
     ];
 
