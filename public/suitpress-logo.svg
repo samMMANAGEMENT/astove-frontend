@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 100 100">
+  <!-- Fondo gris muy oscuro (#0a0a0a) con bordes redondeados -->
+  <rect width="100%" height="100%" fill="#0a0a0a" rx="20" ry="20"/>
+  
+  <!-- Path en gris claro -->
+  <path
+    d="M35 20 C30 35, 70 65, 65 80"
+    stroke="#dbdbdb"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+</svg>

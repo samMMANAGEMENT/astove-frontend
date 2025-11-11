@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { toast } from 'react-toastify';
-import logo from '../../assets/login-macbook.png';
+import logo from '/suitpress-logo.svg';
 import { Spinner } from '../ui';
 
 export default function LoginComponent() {
