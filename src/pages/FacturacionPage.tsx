@@ -14,7 +14,6 @@ const FacturacionPage: React.FC = () => {
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
-    const [totalItems, setTotalItems] = useState(0);
 
     // Selection state
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -33,7 +32,6 @@ const FacturacionPage: React.FC = () => {
             const response = await facturacionService.listarFacturas({ page: currentPage, per_page: 10 });
             setFacturas(response.data);
             setTotalPages(response.pagination.total_pages);
-            setTotalItems(response.pagination.total);
             // Clear selection on page change if desired, or keep it. Keeping it for now.
         } catch (error) {
             console.error('Error al cargar facturas:', error);
@@ -139,7 +137,7 @@ const FacturacionPage: React.FC = () => {
                     />
                 </div>
             ),
-            render: (value: any, row: Factura) => (
+            render: (_: any, row: Factura) => (
                 <div className="flex items-center gap-3">
                     <input
                         type="checkbox"
