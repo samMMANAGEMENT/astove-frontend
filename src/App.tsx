@@ -25,6 +25,7 @@ import GastosPage from "./pages/GastosPage";
 import InventarioPage from "./pages/InventarioPage";
 import AgendasPage from "./pages/AgendasPage";
 import AgendaCalendarioPage from "./pages/AgendaCalendarioPage";
+import FacturacionPage from "./pages/FacturacionPage";
 
 
 function AppContent() {
@@ -157,6 +158,13 @@ function AppContent() {
           <ProtectedRoute>
             <DefaultLayout>
               <AgendaCalendarioPage />
+            </DefaultLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/facturacion" element={
+          <ProtectedRoute>
+            <DefaultLayout>
+              <FacturacionPage />
             </DefaultLayout>
           </ProtectedRoute>
         } />

@@ -89,6 +89,12 @@ const getSidebarItems = (userRole?: string, hasModuleAccess?: (module: string) =
             icon: <Calendar className="w-5 h-5" />,
             href: '/agendas',
         },
+        {
+            id: 'facturacion',
+            label: 'Facturación',
+            icon: <CircleDollarSign className="w-5 h-5" />,
+            href: '/facturacion'
+        }
     ];
 
     // Items solo para admin y supervisor (con verificación de permisos)
@@ -162,7 +168,7 @@ const getSidebarItems = (userRole?: string, hasModuleAccess?: (module: string) =
         return items.filter(item => {
             // Si no hay función de verificación de permisos, mostrar todo
             if (!hasModuleAccess) return true;
-            
+
             // Mapear IDs de items a módulos
             const moduleMap: { [key: string]: string } = {
                 'dashboard': 'dashboard',

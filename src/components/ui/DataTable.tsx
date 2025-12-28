@@ -4,7 +4,7 @@ import { Paginator } from './index';
 
 export interface Column<T> {
   key: keyof T;
-  header: string;
+  header: string | React.ReactNode;
   render?: (value: T[keyof T], row: T) => React.ReactNode;
   className?: string;
 }
@@ -110,7 +110,7 @@ const DataTable = <T extends Record<string, any>>({
                         const Icon = action.icon;
                         const isDisabled = action.disabled ? action.disabled(row) : false;
                         const tooltipText = typeof action.tooltip === 'function' ? action.tooltip(row) : action.tooltip;
-                        
+
                         return (
                           <button
                             key={actionIndex}
